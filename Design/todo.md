@@ -1,0 +1,47 @@
+## TODO: Create Comprehensive Design Document for PT-CLI
+
+- [x] Draft Section 1: Introduction (Purpose, Scope, Definitions, References, Overview)
+- [x] Draft Section 2: System Architecture
+    - [x] Component Diagram Description (Python/Rust Modules)
+    - [x] Data Flow Diagram Description
+    - [x] Internal API Definition (Python-Rust via PyO3)
+- [x] Draft Section 3: Module-Level Design - Python Application Layer
+    - [x] `main.py` Design (CLI entry point, workflow orchestration)
+    - [x] `config.py` Design (Loading, validation using Pydantic)
+    - [x] `data_io.py` Design (Reading CSV/Excel using Pandas, validation using Pydantic)
+    - [x] `reporting.py` Design (Data prep for Quarto, plot generation, Quarto invocation)
+    - [x] Other Python utility modules (if any)
+- [x] Draft Section 4: Module-Level Design - Rust Calculation Engine
+    - [x] `lib.rs` / `main.rs` (PyO3 module definition)
+    - [x] `estimators.rs` Design (Algorithm A, CRM, Formulation, Expert Consensus methods)
+    - [x] `uncertainty.rs` Design (Uncertainty calculation for each estimation method)
+    - [x] `scoring.rs` Design (z-score, z		-score calculation)
+    - [x] `utils.rs` Design (Common utilities, data structures)
+    - [x] Rust Error Handling Strategy- [x] Draft Section 5: Command Line Interface (CLI) Design
+    - [x] CLI Structure (Typer sub-commands: calculate, validate-data, generate-report-only)
+    - [x] Argument and Option Specification
+    - [x] Example Usage Scenarios
+- [x] Draft Section 6: Data Handling and Configuration Design
+    - [x] Configuration File Structure (YAML/TOML) and Parameters
+    - [x] Configuration Validation (Pydantic)
+    - [x] Input Data Validation Flow (Pydantic)
+- [x] Draft Section 7: Reporting System Design
+    - [x] Default Quarto Template (`.qmd`) Structure and Content
+    - [x] Data Preparation and Passing Mechanism (Python to Quarto)
+    - [x] Plot Generation and Integration (Matplotlib/Seaborn)
+- [x] Draft Section 8: Comprehensive Error Handling Strategy
+    - [x] Error Detection and Logging (Python & Rust)
+    - [x] Error Propagation (Rust to Python)
+    - [x] User-Facing Error Message Design
+- [x] Draft Section 9: Deployment and Installation Plan
+    - [x] Packaging Strategy (Python + Rust extension via Maturin)
+    - [x] Installation Guide (Prerequisites: Python, Quarto, Package)
+- [x] Draft Section 10: Detailed Test Plan
+    - [x] Unit Testing Strategy (Python `unittest`/`pytest`, Rust `cargo test`)
+    - [x] Integration Testing Strategy (Python-Rust, Python-Quarto)
+    - [x] End-to-End Testing Strategy
+    - [x] Sample Datasets Definition (Normal, Edge Cases, Error Cases)
+    - [x] Report Verification Strategy
+- [x] Compile all draft sections into the final design document (`PT_CLI_Design_Document.md`).
+- [x] Review and Validate final document against SRS and request.
+- [x] Convert final document to PDF (optional, but good practice).
