@@ -1,0 +1,19 @@
+[input_data]
+participant_id_col = "ParticipantID"
+result_col = "Value"
+uncertainty_col = "Uncertainty"
+
+[calculation]
+method = "AlgorithmA"
+sigma_pt = 0.20
+
+[calculation.algorithm_a]
+tolerance = 1.0e-6
+max_iterations = 100
+
+[reporting]
+default_format = "html"
+
+[reporting.plots]
+generate_histogram = true
+histogram_bins = 25
