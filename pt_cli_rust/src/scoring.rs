@@ -23,10 +23,8 @@ pub fn calculate_z_scores(
     x_pt: f64,
     sigma_pt: f64,
 ) -> Result<Array1<f64>, CalculationError> {
-    let data = results.to_vec();
-    
     // Validate inputs
-    validate_floats(&data, "participant results")?;
+    validate_floats(&results, "participant results")?;
     
     if !is_valid_float(x_pt) {
         return Err(CalculationError::InvalidInput {
