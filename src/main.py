@@ -13,6 +13,15 @@ from rich.panel import Panel
 from rich.table import Table
 from rich import print as rich_print
 import json
+import numpy as np
+
+# Import Rust calculation engine
+try:
+    import pt_cli_rust
+    RUST_ENGINE_AVAILABLE = True
+except ImportError:
+    RUST_ENGINE_AVAILABLE = False
+    print("Warning: Rust calculation engine not available. Install with: pip install ./pt_cli_rust")
 
 from .config import load_config, ConfigValidationError, MainConfig
 from .data_io import (
@@ -74,6 +83,149 @@ def display_info(message: str, title: str = "Info") -> None:
         title=f"[blue]{title}[/blue]",
         border_style="blue"
     ))
+
+
+def perform_calculations(calculation_data: dict, config: MainConfig) -> dict:
+    """Perform statistical calculations using the Rust engine.
+    
+    Args:
+        calculation_data: Dictionary with participant data arrays
+        config: Configuration object with calculation parameters
+        
+    Returns:
+        Dictionary with calculation results
+        
+    Raises:
+        RuntimeError: If Rust engine is not available or calculation fails
+    """
+    if not RUST_ENGINE_AVAILABLE:
+        raise RuntimeError("Rust calculation engine is not available")
+    
+    method = config.calculation.method
+    results_array = calculation_data['results']
+    
+    # Ensure results are numpy arrays with proper dtype
+    results = np.asarray(results_array, dtype=np.float64)
+    
+    try:
+        # Calculate assigned value based on method
+        if method == "AlgorithmA":
+            # Use robust Algorithm A
+            tolerance = config.calculation.algorithm_a.tolerance
+            max_iterations = config.calculation.algorithm_a.max_iterations
+            
+            x_pt, s_star, participants_used, iterations = pt_cli_rust.py_calculate_algorithm_a(
+                results, tolerance, max_iterations
+            )
+            
+            # Calculate uncertainty for consensus value
+            u_x_pt = pt_cli_rust.py_calculate_uncertainty_consensus(s_star, participants_used)
+            
+            calc_details = {
+                's_star': s_star,
+                'participants_used': participants_used,
+                'iterations': iterations,
+                'tolerance': tolerance,
+                'max_iterations': max_iterations
+            }
+            
+        elif method == "CRM":
+            # CRM-based calculation
+            crm_value = config.calculation.crm.certified_value
+            crm_uncertainty = config.calculation.crm.uncertainty
+            
+            if crm_value is None:
+                raise ValueError("CRM certified value not specified in configuration")
+            if crm_uncertainty is None:
+                raise ValueError("CRM uncertainty not specified in configuration")
+                
+            x_pt = pt_cli_rust.py_calculate_from_crm(crm_value)
+            u_x_pt = pt_cli_rust.py_calculate_uncertainty_crm(crm_uncertainty)
+            
+            calc_details = {
+                'certified_value': crm_value,
+                'uncertainty': crm_uncertainty
+            }
+            
+        elif method == "Formulation":
+            # Formulation-based calculation
+            formulation_value = config.calculation.formulation.known_value
+            formulation_uncertainty = config.calculation.formulation.uncertainty
+            
+            if formulation_value is None:
+                raise ValueError("Formulation known value not specified in configuration")
+            if formulation_uncertainty is None:
+                raise ValueError("Formulation uncertainty not specified in configuration")
+                
+            x_pt = pt_cli_rust.py_calculate_from_formulation(formulation_value)
+            u_x_pt = pt_cli_rust.py_calculate_uncertainty_formulation(formulation_uncertainty)
+            
+            calc_details = {
+                'known_value': formulation_value,
+                'uncertainty': formulation_uncertainty
+            }
+            
+        elif method == "Expert":
+            # Expert consensus calculation
+            expert_value = config.calculation.expert_consensus.consensus_value
+            expert_uncertainty = config.calculation.expert_consensus.uncertainty
+            
+            if expert_value is None:
+                raise ValueError("Expert consensus value not specified in configuration")
+            if expert_uncertainty is None:
+                raise ValueError("Expert consensus uncertainty not specified in configuration")
+                
+            x_pt = pt_cli_rust.py_calculate_from_expert_consensus(expert_value)
+            u_x_pt = pt_cli_rust.py_calculate_uncertainty_expert(expert_uncertainty)
+            
+            calc_details = {
+                'consensus_value': expert_value,
+                'uncertainty': expert_uncertainty
+            }
+            
+        else:
+            raise ValueError(f"Unknown calculation method: {method}")
+        
+        # Calculate performance scores
+        sigma_pt = config.calculation.sigma_pt
+        z_scores = pt_cli_rust.py_calculate_z_scores(results, x_pt, sigma_pt)
+        
+        # Calculate zeta-scores if participant uncertainties are available
+        if 'uncertainties' in calculation_data and calculation_data['uncertainties'] is not None:
+            uncertainties = np.asarray(calculation_data['uncertainties'], dtype=np.float64)
+            # Check if uncertainties are valid (not NaN and not all zero)
+            valid_uncertainties = ~np.isnan(uncertainties) & (uncertainties > 0)
+            
+            if np.any(valid_uncertainties):
+                z_prime_scores = pt_cli_rust.py_calculate_z_prime_scores(
+                    results, uncertainties, x_pt, u_x_pt
+                )
+            else:
+                # Use simplified zeta-scores without participant uncertainties
+                z_prime_scores = pt_cli_rust.py_calculate_z_prime_scores_no_uncertainties(
+                    results, x_pt, u_x_pt
+                )
+        else:
+            # Use simplified zeta-scores without participant uncertainties
+            z_prime_scores = pt_cli_rust.py_calculate_z_prime_scores_no_uncertainties(
+                results, x_pt, u_x_pt
+            )
+        
+        # Compile results
+        calculation_results = {
+            'x_pt': float(x_pt),
+            'u_x_pt': float(u_x_pt),
+            'method_used': method,
+            'sigma_pt_used': sigma_pt,
+            'participant_scores': z_scores.tolist(),
+            'participant_z_prime_scores': z_prime_scores.tolist(),
+            'calculation_details': calc_details
+        }
+        
+        return calculation_results
+        
+    except Exception as e:
+        raise RuntimeError(f"Calculation failed: {str(e)}") from e
 
 
 @app.command()
@@ -164,33 +316,34 @@ def calculate(
             progress.update(task, description="Preparing calculation data...")
             calculation_data = prepare_calculation_data(input_data, config)
             
-            # TODO: Call Rust calculation engine here
-            # For now, create mock results
+            # Perform calculations using Rust engine
             progress.update(task, description="Performing calculations...")
-            mock_results = {
-                'x_pt': 10.0,  # Mock assigned value
-                'u_x_pt': 0.5,  # Mock uncertainty
-                'method_used': config.calculation.method,
-                'sigma_pt_used': config.calculation.sigma_pt,
-                'participant_scores': [0.1, -0.2, 0.5, -0.1] * (len(input_data) // 4 + 1)
-            }
-            mock_results['participant_scores'] = mock_results['participant_scores'][:len(input_data)]
-            
-            if verbose:
-                console.print(f"✓ Calculations completed using {config.calculation.method}")
+            try:
+                results = perform_calculations(calculation_data, config)
+                if verbose:
+                    console.print(f"✓ Calculations completed using {config.calculation.method}")
+                    if 'calculation_details' in results:
+                        details = results['calculation_details']
+                        if config.calculation.method == "AlgorithmA":
+                            console.print(f"  - Iterations: {details['iterations']}")
+                            console.print(f"  - Participants used: {details['participants_used']}")
+                            console.print(f"  - Robust std dev (s*): {details['s_star']:.6f}")
+            except RuntimeError as e:
+                display_error(f"Calculation error: {e}", "Calculation Error")
+                raise typer.Exit(1)
             
             # Save intermediate results if requested
             if results_json:
                 progress.update(task, description="Saving intermediate results...")
                 with open(results_json, 'w') as f:
-                    json.dump(mock_results, f, indent=2)
+                    json.dump(results, f, indent=2)
                 if verbose:
                     console.print(f"✓ Results saved to {results_json}")
             
             # Generate report
             progress.update(task, description="Generating report...")
             try:
-                report_data = aggregate_report_data(input_data, config, mock_results)
+                report_data = aggregate_report_data(input_data, config, results)
                 generate_report(report_data, config, output_report, output_format)
                 if verbose:
                     final_report_path = output_report.with_suffix(f".{output_format}")
@@ -205,7 +358,9 @@ def calculate(
             f"Analysis completed successfully!\\n"
             f"Report generated: {final_report_path}\\n"
             f"Participants analyzed: {len(input_data)}\\n"
-            f"Method used: {config.calculation.method}",
+            f"Method used: {config.calculation.method}\\n"
+            f"Assigned value (x_pt): {results['x_pt']:.6f}\\n"
+            f"Uncertainty u(x_pt): {results['u_x_pt']:.6f}",
             "Analysis Complete"
         )
         
