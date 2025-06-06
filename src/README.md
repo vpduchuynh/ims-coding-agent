@@ -135,13 +135,12 @@ P003,10.42,0.06
 
 The implementation requires the following Python packages:
 - `pydantic`: Configuration and data validation
-- `pandas`: Data file reading and processing
+- `polars[excel]`: Data file reading and processing
 - `matplotlib`, `seaborn`: Plot generation
 - `typer`: CLI framework
 - `rich`: Console formatting and progress indicators
 - `PyYAML`: YAML configuration support
 - `toml`: TOML configuration support
-- `openpyxl`: Excel file support
 
 ## Error Handling
 

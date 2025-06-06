@@ -12,7 +12,7 @@ The PT-CLI application, consisting of the Python application layer and the Rust 
 **Build Process:**
 
 1.  **Project Structure:** The project will be structured to be compatible with Maturin. Typically, this involves having the Python code (`main.py`, `config.py`, etc.) in a source directory (e.g., `src/pt_cli/`) and the Rust crate (`Cargo.toml`, `src/lib.rs`, etc.) at the project root or in a dedicated subdirectory.
-2.  **`pyproject.toml` Configuration:** A `pyproject.toml` file will be configured at the project root. This file defines project metadata (name, version, author, description), Python dependencies (Typer, Pandas, Pydantic, etc.), and Maturin build settings.
+2.  **`pyproject.toml` Configuration:** A `pyproject.toml` file will be configured at the project root. This file defines project metadata (name, version, author, description), Python dependencies (Typer, Polars, Pydantic, etc.), and Maturin build settings.
     ```toml
     # Example pyproject.toml snippet
     [build-system]
@@ -27,7 +27,7 @@ The PT-CLI application, consisting of the Python application layer and the Rust 
     authors = [{name = "Your Name/Org", email = "your@email.com"}]
     dependencies = [
         "typer[all]>=0.9.0",
-        "pandas>=1.5.0",
+        "polars[excel]>=0.20.0",
         "pydantic>=1.10.0",
         "pyyaml>=6.0",
         "toml>=0.10.0",

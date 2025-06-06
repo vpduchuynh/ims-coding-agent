@@ -8,7 +8,7 @@
 - [x] Draft Section 3: Module-Level Design - Python Application Layer
     - [x] `main.py` Design (CLI entry point, workflow orchestration)
     - [x] `config.py` Design (Loading, validation using Pydantic)
-    - [x] `data_io.py` Design (Reading CSV/Excel using Pandas, validation using Pydantic)
+    - [x] `data_io.py` Design (Reading CSV/Excel using Polars, validation using Pydantic)
     - [x] `reporting.py` Design (Data prep for Quarto, plot generation, Quarto invocation)
     - [x] Other Python utility modules (if any)
 - [x] Draft Section 4: Module-Level Design - Rust Calculation Engine

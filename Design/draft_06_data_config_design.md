@@ -112,22 +112,22 @@ This approach ensures that the rest of the application receives a guaranteed-val
 
 ### 6.3 Input Data Validation Flow (Pydantic) (FR-DI-003, FR-DI-004, FR-DI-005)
 
-Input participant data (CSV/Excel) requires validation to ensure it meets the structural and type requirements before being used in calculations. This validation will occur in the `data_io.py` module after loading the data into a Pandas DataFrame, leveraging both Pandas capabilities and Pydantic for enhanced checking.
+Input participant data (CSV/Excel) requires validation to ensure it meets the structural and type requirements before being used in calculations. This validation will occur in the `data_io.py` module after loading the data into a Polars DataFrame, leveraging both Polars capabilities and Pydantic for enhanced checking.
 
 **Process:**
 
-1.  **Load Data:** Read the CSV or Excel file into a Pandas DataFrame using `pd.read_csv` or `pd.read_excel` (FR-DI-002).
+1.  **Load Data:** Read the CSV or Excel file into a Polars DataFrame using `pl.read_csv` or `pl.read_excel` (FR-DI-002).
 2.  **Column Presence Check (FR-DI-003):** Verify that the columns specified in the configuration (`input_data.participant_id_col`, `input_data.result_col`, `input_data.uncertainty_col` if provided and needed) exist in the DataFrame. Raise an informative error (e.g., `MissingColumnError`) if any required column is missing.
-3.  **Initial Type Conversion (Pandas):** Attempt to convert the essential columns (results, uncertainties) to numeric types using `pd.to_numeric(errors='coerce')`. This will turn non-numeric values into `NaN`.
-4.  **Missing Value Check:** Check for `NaN` values in the critical numeric columns (results). Decide on a strategy: either raise an error immediately, report warnings, or allow the Rust engine to handle them (though filtering them out in Python is often cleaner).
+3.  **Initial Type Conversion (Polars):** Attempt to convert the essential columns (results, uncertainties) to numeric types using `cast(pl.Float64, strict=False)`. This will turn non-numeric values into `null`.
+4.  **Missing Value Check:** Check for `null` values in the critical numeric columns (results). Decide on a strategy: either raise an error immediately, report warnings, or allow the Rust engine to handle them (though filtering them out in Python is often cleaner).
 5.  **(Optional but Recommended) Row-Level Pydantic Validation (FR-DI-005):** For more rigorous validation, especially if there are complex cross-field rules or specific format requirements for IDs:
     *   Define a Pydantic model representing a single row of data (e.g., `ParticipantDataRow`).
     *   Iterate through the DataFrame rows (`df.itertuples()` or similar efficient method).
     *   For each row, create a dictionary and attempt to parse it with the `ParticipantDataRow` model.
     *   Collect any `ValidationError` exceptions. This can pinpoint specific rows and fields causing issues.
     *   This step adds overhead but provides much more detailed validation feedback than DataFrame-level checks alone.
-6.  **Final Type Check (FR-DI-004):** After coercion and potential Pydantic validation, double-check the `dtype` of the critical Pandas Series (e.g., ensure the result column is indeed float or int).
+6.  **Final Type Check (FR-DI-004):** After coercion and potential Pydantic validation, double-check the `dtype` of the critical Polars Series (e.g., ensure the result column is indeed float or int).
 7.  **Error Reporting (FR-DI-006):** If any validation step fails, raise specific exceptions (e.g., `DataValidationError`, `InvalidTypeError`) containing clear messages about the nature and location (e.g., column name, row number if using row-level validation) of the error. These exceptions will be caught by `main.py` and reported to the user.
 8.  **Return Validated Data:** If all checks pass, return the validated (and potentially cleaned) DataFrame or extracted NumPy arrays ready for the calculation engine.
 
-This multi-stage validation process, combining Pandas efficiency with Pydantic's rigorous schema definition, ensures data quality and prevents errors during the critical calculation phase.
+This multi-stage validation process, combining Polars efficiency with Pydantic's rigorous schema definition, ensures data quality and prevents errors during the critical calculation phase.

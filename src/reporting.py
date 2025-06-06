@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pandas as pd
+import polars as pl
 import numpy as np
 
 from .config import MainConfig
@@ -218,7 +218,7 @@ if 'participant_results' in data:
 #| echo: false
 
 if 'participant_results' in data:
-    import pandas as pd
+    import numpy as np
     results = np.array(data['participant_results'])
     
     summary_stats = {
@@ -232,8 +232,11 @@ if 'participant_results' in data:
         'Q3': np.percentile(results, 75)
     }
     
-    df = pd.DataFrame(list(summary_stats.items()), columns=['Statistic', 'Value'])
-    print(df.to_markdown(index=False, floatfmt='.6f'))
+    # Simple table formatting without pandas
+    print("| Statistic | Value |")
+    print("|-----------|-------|")
+    for stat, value in summary_stats.items():
+        print(f"| {stat} | {value:.6f} |")
 ```
 
 ---
@@ -349,7 +352,7 @@ def generate_report(report_data: Dict[str, Any], config: MainConfig,
         _invoke_quarto(template_path, final_output_path, output_format, data_file_path)
 
 
-def aggregate_report_data(input_data: pd.DataFrame, config: MainConfig, 
+def aggregate_report_data(input_data: pl.DataFrame, config: MainConfig, 
                          calculation_results: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Aggregate all data needed for the report.
     
@@ -363,10 +366,10 @@ def aggregate_report_data(input_data: pd.DataFrame, config: MainConfig,
     """
     # Extract participant results
     result_col = config.input_data.result_col
-    participant_results = input_data[result_col].values
+    participant_results = input_data.get_column(result_col).to_numpy()
     
     report_data = {
-        'participant_ids': input_data[config.input_data.participant_id_col].tolist(),
+        'participant_ids': input_data.get_column(config.input_data.participant_id_col).to_list(),
         'participant_results': participant_results.tolist(),
         'config': {
             'calculation': {
@@ -396,7 +399,7 @@ def aggregate_report_data(input_data: pd.DataFrame, config: MainConfig,
     # Add uncertainty data if available
     uncertainty_col = config.input_data.uncertainty_col
     if uncertainty_col and uncertainty_col in input_data.columns:
-        uncertainties = input_data[uncertainty_col].values
+        uncertainties = input_data.get_column(uncertainty_col).to_numpy()
         report_data['participant_uncertainties'] = uncertainties.tolist()
     
     return report_data
