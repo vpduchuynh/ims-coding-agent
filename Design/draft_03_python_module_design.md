@@ -61,24 +61,24 @@ This section provides a detailed design for each primary module within the Pytho
 
 **Key Responsibilities:**
 
-*   **Data Reading (FR-DI-001, FR-DI-002):** Implement functions to read data from CSV and Excel (.xlsx) files using the `pandas` library into DataFrames.
+*   **Data Reading (FR-DI-001, FR-DI-002):** Implement functions to read data from CSV and Excel (.xlsx) files using the `polars` library into DataFrames.
 *   **Structure Validation (FR-DI-003, DR-IN-001):** Check for the presence of required columns based on names specified in the configuration (e.g., participant ID, result value, participant uncertainty `u(x_i)` if needed for FR-PS-002/FR-PS-003).
 *   **Data Type Validation (FR-DI-004):** Validate that relevant columns contain the expected data types (e.g., numerical results, numeric uncertainties).
-*   **Pydantic Integration (FR-DI-005):** Leverage Pydantic models, potentially dynamically created or selected based on configuration, to validate the data row-by-row or the DataFrame structure as a whole. This provides robust validation beyond basic pandas checks.
+*   **Pydantic Integration (FR-DI-005):** Leverage Pydantic models, potentially dynamically created or selected based on configuration, to validate the data row-by-row or the DataFrame structure as a whole. This provides robust validation beyond basic polars checks.
 *   **Error Reporting (FR-DI-006):** Raise specific, informative exceptions if validation fails (e.g., `MissingColumnError`, `InvalidDataTypeError`), which can be caught by `main.py`.
 *   **Data Preparation:** Prepare the validated data (e.g., extracting relevant columns as NumPy arrays) for passing to the Rust calculation engine.
 
 **Primary Classes/Functions:**
 
 *   Pydantic Models (e.g., `ParticipantDataRow`): Define the expected structure and types for a row of input data, potentially referencing configuration for column names.
-*   `load_and_validate_data(file_path: Path, config: MainConfig) -> pd.DataFrame`: The main function called by `main.py`. Reads the file using pandas, performs validation (structural, type, potentially Pydantic-based), and returns the validated DataFrame. Raises exceptions on failure.
+*   `load_and_validate_data(file_path: Path, config: MainConfig) -> pl.DataFrame`: The main function called by `main.py`. Reads the file using polars, performs validation (structural, type, potentially Pydantic-based), and returns the validated DataFrame. Raises exceptions on failure.
 *   Helper functions for reading specific file types (`_read_csv`, `_read_excel`).
 *   Helper functions for performing validation checks.
 
 **Interactions:**
 
 *   Called by `main.py`.
-*   Uses `pandas` for reading files.
+*   Uses `polars` for reading files.
 *   Uses `Pydantic` for validation.
 *   Uses configuration object (from `config.py`) to determine expected columns, types, etc.
 *   Reads input data files from the filesystem.

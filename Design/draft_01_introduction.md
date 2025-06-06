@@ -41,7 +41,7 @@ This design document is based on and refers to the following key documents and r
 3.  **ISO 13528:2022:** "Statistical methods for use in proficiency testing by interlaboratory comparison." - The core standard guiding the statistical methodologies.
 4.  **Typer Documentation:** [https://typer.tiangolo.com/](https://typer.tiangolo.com/) - For CLI implementation.
 5.  **Pydantic Documentation:** [https://pydantic-docs.helpmanual.io/](https://pydantic-docs.helpmanual.io/) - For data validation.
-6.  **Pandas Documentation:** [https://pandas.pydata.org/](https://pandas.pydata.org/) - For data manipulation.
+6.  **Polars Documentation:** [https://polars.rs/](https://polars.rs/) - For data manipulation.
 7.  **PyO3 Documentation:** [https://pyo3.rs/](https://pyo3.rs/) - For Python-Rust interoperability.
 8.  **Rust Documentation:** [https://www.rust-lang.org/learn](https://www.rust-lang.org/learn) - For Rust language specifics.
 9.  **Relevant Rust Crates Documentation:** (e.g., `statrs`, `ndarray`, `ndarray-stats`, `serde`)

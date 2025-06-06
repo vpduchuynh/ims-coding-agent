@@ -137,7 +137,7 @@ The application is intended to be used as a command-line tool. It will not inclu
     
 - Quarto documentation: [https://quarto.org/](https://quarto.org/ "null")
     
-- Pandas documentation: [https://pandas.pydata.org/](https://pandas.pydata.org/ "null")
+- Polars documentation: [https://polars.rs/](https://polars.rs/ "null")
     
 - Pydantic documentation: [https://pydantic-docs.helpmanual.io/](https://pydantic-docs.helpmanual.io/ "null")
     
@@ -213,7 +213,7 @@ The primary users of the PT-CLI are expected to be:
         
     - Quarto CLI (must be installed separately by the user)
         
-    - Python libraries: Typer, Pandas, Pydantic, PyYAML/TOML, Rich, Matplotlib/Seaborn, subprocess.
+    - Python libraries: Typer, Polars, Pydantic, PyYAML/TOML, Rich, Matplotlib/Seaborn, subprocess.
         
     - Rust crates: PyO3, statrs, ndarray, ndarray-stats, serde.
         
@@ -241,7 +241,7 @@ The primary users of the PT-CLI are expected to be:
 
 - **FR-DI-001:** The system shall allow users to specify input data files in CSV or Excel (XLSX) format via a CLI argument.
     
-- **FR-DI-002:** The system shall use `pandas` for reading and handling tabular data.
+- **FR-DI-002:** The system shall use `polars` for reading and handling tabular data.
     
 - **FR-DI-003:** The system shall validate the structure of the input data (e.g., presence of required columns like 'participant_id', 'result').
     
