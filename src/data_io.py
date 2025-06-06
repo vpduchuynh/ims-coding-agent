@@ -6,9 +6,9 @@ validating data structure and types, and preparing data for calculations.
 
 from pathlib import Path
 from typing import List, Optional, Union, Any
-import pandas as pd
+import polars as pl
 import numpy as np
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from .config import MainConfig
 
@@ -19,14 +19,16 @@ class ParticipantDataRow(BaseModel):
     result: float = Field(..., description="Participant result value")
     uncertainty: Optional[float] = Field(default=None, ge=0, description="Participant uncertainty")
 
-    @validator('result')
+    @field_validator('result')
+    @classmethod
     def result_must_be_finite(cls, v):
         """Validate that result is a finite number."""
         if not np.isfinite(v):
             raise ValueError("Result must be a finite number")
         return v
 
-    @validator('uncertainty')
+    @field_validator('uncertainty')
+    @classmethod
     def uncertainty_must_be_positive_or_none(cls, v):
         """Validate that uncertainty is positive if provided."""
         if v is not None and v < 0:
@@ -49,7 +51,7 @@ class InvalidDataTypeError(DataValidationError):
     pass
 
 
-def _read_csv(file_path: Path) -> pd.DataFrame:
+def _read_csv(file_path: Path) -> pl.DataFrame:
     """Read CSV file into DataFrame.
     
     Args:
@@ -62,12 +64,12 @@ def _read_csv(file_path: Path) -> pd.DataFrame:
         DataValidationError: If file cannot be read.
     """
     try:
-        return pd.read_csv(file_path)
+        return pl.read_csv(file_path)
     except Exception as e:
         raise DataValidationError(f"Failed to read CSV file {file_path}: {e}")
 
 
-def _read_excel(file_path: Path) -> pd.DataFrame:
+def _read_excel(file_path: Path) -> pl.DataFrame:
     """Read Excel file into DataFrame.
     
     Args:
@@ -80,12 +82,12 @@ def _read_excel(file_path: Path) -> pd.DataFrame:
         DataValidationError: If file cannot be read.
     """
     try:
-        return pd.read_excel(file_path)
+        return pl.read_excel(file_path, engine='calamine')
     except Exception as e:
         raise DataValidationError(f"Failed to read Excel file {file_path}: {e}")
 
 
-def _check_required_columns(df: pd.DataFrame, config: MainConfig) -> None:
+def _check_required_columns(df: pl.DataFrame, config: MainConfig) -> None:
     """Check that required columns exist in the DataFrame.
     
     Args:
@@ -113,7 +115,7 @@ def _check_required_columns(df: pd.DataFrame, config: MainConfig) -> None:
         )
 
 
-def _validate_data_types(df: pd.DataFrame, config: MainConfig) -> pd.DataFrame:
+def _validate_data_types(df: pl.DataFrame, config: MainConfig) -> pl.DataFrame:
     """Validate and convert data types for relevant columns.
     
     Args:
@@ -126,17 +128,14 @@ def _validate_data_types(df: pd.DataFrame, config: MainConfig) -> pd.DataFrame:
     Raises:
         InvalidDataTypeError: If data conversion fails.
     """
-    df = df.copy()
-    
-    # Convert result column to numeric
+    # Convert result column to numeric using polars cast with strict=False
     result_col = config.input_data.result_col
-    try:
-        df[result_col] = pd.to_numeric(df[result_col], errors='coerce')
-    except Exception as e:
-        raise InvalidDataTypeError(f"Failed to convert {result_col} to numeric: {e}")
+    df = df.with_columns(
+        pl.col(result_col).cast(pl.Float64, strict=False)
+    )
     
-    # Check for NaN values in results
-    nan_count = df[result_col].isna().sum()
+    # Check for null values in results
+    nan_count = df.select(pl.col(result_col).is_null()).sum().item()
     if nan_count > 0:
         raise InvalidDataTypeError(
             f"Found {nan_count} non-numeric or missing values in {result_col} column"
@@ -145,13 +144,12 @@ def _validate_data_types(df: pd.DataFrame, config: MainConfig) -> pd.DataFrame:
     # Convert uncertainty column to numeric if present
     uncertainty_col = config.input_data.uncertainty_col
     if uncertainty_col and uncertainty_col in df.columns:
-        try:
-            df[uncertainty_col] = pd.to_numeric(df[uncertainty_col], errors='coerce')
-        except Exception as e:
-            raise InvalidDataTypeError(f"Failed to convert {uncertainty_col} to numeric: {e}")
+        df = df.with_columns(
+            pl.col(uncertainty_col).cast(pl.Float64, strict=False)
+        )
         
         # Check for negative uncertainties
-        negative_uncertainties = (df[uncertainty_col] < 0).sum()
+        negative_uncertainties = df.filter(pl.col(uncertainty_col) < 0).height
         if negative_uncertainties > 0:
             raise InvalidDataTypeError(
                 f"Found {negative_uncertainties} negative values in {uncertainty_col} column"
@@ -160,7 +158,7 @@ def _validate_data_types(df: pd.DataFrame, config: MainConfig) -> pd.DataFrame:
     return df
 
 
-def _validate_with_pydantic(df: pd.DataFrame, config: MainConfig) -> None:
+def _validate_with_pydantic(df: pl.DataFrame, config: MainConfig) -> None:
     """Perform row-level validation using Pydantic models.
     
     Args:
@@ -176,24 +174,28 @@ def _validate_with_pydantic(df: pd.DataFrame, config: MainConfig) -> None:
     
     validation_errors = []
     
-    for idx, row in df.iterrows():
+    # Convert to list of dictionaries for iteration
+    rows = df.to_dicts()
+    
+    for i, row_data_dict in enumerate(rows):
         try:
-            row_data = {
-                'participant_id': str(row[participant_id_col]),
-                'result': float(row[result_col])
+            # Remap dict keys for Pydantic model
+            pydantic_data = {
+                'participant_id': str(row_data_dict[participant_id_col]),
+                'result': row_data_dict[result_col]
             }
             
-            # Add uncertainty if column exists and value is not NaN
-            if uncertainty_col and uncertainty_col in df.columns:
-                uncertainty_value = row[uncertainty_col]
-                if pd.notna(uncertainty_value):
-                    row_data['uncertainty'] = float(uncertainty_value)
+            # Add uncertainty if column exists and value is not None
+            if uncertainty_col and uncertainty_col in row_data_dict:
+                uncertainty_value = row_data_dict[uncertainty_col]
+                if uncertainty_value is not None:
+                    pydantic_data['uncertainty'] = uncertainty_value
             
             # Validate with Pydantic
-            ParticipantDataRow(**row_data)
+            ParticipantDataRow(**pydantic_data)
             
         except Exception as e:
-            validation_errors.append(f"Row {idx + 1}: {e}")
+            validation_errors.append(f"Row {i + 1}: {e}")
     
     if validation_errors:
         error_message = "Data validation errors:\n" + "\n".join(validation_errors[:10])
@@ -202,7 +204,7 @@ def _validate_with_pydantic(df: pd.DataFrame, config: MainConfig) -> None:
         raise DataValidationError(error_message)
 
 
-def load_and_validate_data(file_path: Path, config: MainConfig) -> pd.DataFrame:
+def load_and_validate_data(file_path: Path, config: MainConfig) -> pl.DataFrame:
     """Load and validate input data file.
     
     Args:
@@ -233,7 +235,7 @@ def load_and_validate_data(file_path: Path, config: MainConfig) -> pd.DataFrame:
         )
     
     # Check if DataFrame is empty
-    if df.empty:
+    if df.height == 0:
         raise DataValidationError("Input file contains no data")
     
     # Validate column presence
@@ -248,7 +250,7 @@ def load_and_validate_data(file_path: Path, config: MainConfig) -> pd.DataFrame:
     return df
 
 
-def prepare_calculation_data(df: pd.DataFrame, config: MainConfig) -> dict:
+def prepare_calculation_data(df: pl.DataFrame, config: MainConfig) -> dict:
     """Prepare validated data for calculation engine.
     
     Args:
@@ -263,14 +265,14 @@ def prepare_calculation_data(df: pd.DataFrame, config: MainConfig) -> dict:
     participant_id_col = config.input_data.participant_id_col
     
     calculation_data = {
-        'participant_ids': df[participant_id_col].values,
-        'results': df[result_col].values
+        'participant_ids': df[participant_id_col].to_numpy(),
+        'results': df[result_col].to_numpy()
     }
     
     # Add uncertainties if available
     if uncertainty_col and uncertainty_col in df.columns:
-        # Fill NaN uncertainties with None or a default value
-        uncertainties = df[uncertainty_col].values
+        # Get uncertainties as numpy array
+        uncertainties = df[uncertainty_col].to_numpy()
         calculation_data['uncertainties'] = uncertainties
     
     return calculation_data
