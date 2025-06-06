@@ -1,4 +1,4 @@
-polars[excel]>=0.20.0
+polars[excel]>=0.20.0,<2.0.0
 pydantic>=1.8.0
 PyYAML>=5.0.0
 toml>=0.10.0
