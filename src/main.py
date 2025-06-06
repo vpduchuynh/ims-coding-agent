@@ -85,6 +85,69 @@ def display_info(message: str, title: str = "Info") -> None:
     ))
 
 
+def validate_method(method: str) -> None:
+    """Validate calculation method option.
+    
+    Args:
+        method: Method to validate.
+        
+    Raises:
+        ValueError: If method is invalid.
+    """
+    valid_methods = ["AlgorithmA", "CRM", "Formulation", "Expert"]
+    if method not in valid_methods:
+        raise ValueError(
+            f"Invalid calculation method: '{method}'. "
+            f"Valid methods are: {', '.join(valid_methods)}"
+        )
+
+
+def validate_sigma_pt(sigma_pt: float) -> None:
+    """Validate sigma_pt option.
+    
+    Args:
+        sigma_pt: Sigma PT value to validate.
+        
+    Raises:
+        ValueError: If sigma_pt is invalid.
+    """
+    if sigma_pt <= 0:
+        raise ValueError(
+            f"Invalid sigma_pt value: {sigma_pt}. "
+            "Sigma PT must be positive (> 0)"
+        )
+
+
+def validate_results_json_path(results_json: Path) -> None:
+    """Validate results JSON path option.
+    
+    Args:
+        results_json: Path to validate.
+        
+    Raises:
+        ValueError: If path is invalid or directory doesn't exist.
+    """
+    # Check if parent directory exists
+    parent_dir = results_json.parent
+    if not parent_dir.exists():
+        raise ValueError(
+            f"Directory does not exist: {parent_dir}. "
+            "Please create the directory first or use an existing path."
+        )
+    
+    # Check if parent directory is writable
+    if not parent_dir.is_dir():
+        raise ValueError(
+            f"Parent path is not a directory: {parent_dir}"
+        )
+    
+    # Check if file already exists and is writable
+    if results_json.exists() and not results_json.is_file():
+        raise ValueError(
+            f"Path exists but is not a file: {results_json}"
+        )
+
+
 def perform_calculations(calculation_data: dict, config: MainConfig) -> dict:
     """Perform statistical calculations using the Rust engine.
     
@@ -297,10 +360,29 @@ def calculate(
                 raise typer.Exit(1)
             
             # Override config values from CLI if provided
-            if method:
-                config.calculation.method = method
-            if sigma_pt:
-                config.calculation.sigma_pt = sigma_pt
+            if method is not None:
+                try:
+                    validate_method(method)
+                    config.calculation.method = method
+                except ValueError as e:
+                    display_error(str(e), "Invalid Method")
+                    raise typer.Exit(1)
+            
+            if sigma_pt is not None:
+                try:
+                    validate_sigma_pt(sigma_pt)
+                    config.calculation.sigma_pt = sigma_pt
+                except ValueError as e:
+                    display_error(str(e), "Invalid Sigma PT")
+                    raise typer.Exit(1)
+            
+            # Validate results JSON path if provided
+            if results_json is not None:
+                try:
+                    validate_results_json_path(results_json)
+                except ValueError as e:
+                    display_error(str(e), "Invalid Results JSON Path")
+                    raise typer.Exit(1)
             
             # Load and validate data
             progress.update(task, description="Loading and validating data...")
@@ -335,10 +417,14 @@ def calculate(
             # Save intermediate results if requested
             if results_json:
                 progress.update(task, description="Saving intermediate results...")
-                with open(results_json, 'w') as f:
-                    json.dump(results, f, indent=2)
-                if verbose:
-                    console.print(f"✓ Results saved to {results_json}")
+                try:
+                    with open(results_json, 'w') as f:
+                        json.dump(results, f, indent=2)
+                    if verbose:
+                        console.print(f"✓ Results saved to {results_json}")
+                except (OSError, IOError, PermissionError) as e:
+                    display_error(f"Failed to save results to {results_json}: {e}", "File Write Error")
+                    raise typer.Exit(1)
             
             # Generate report
             progress.update(task, description="Generating report...")
