@@ -45,29 +45,90 @@ This directory contains the complete implementation of the Python application la
   - CLI parameter overrides for configuration values
   - Robust error handling with user-friendly messages
 
-## Usage Examples
+## CLI Usage Examples
+
+### Getting Help
+```bash
+# Main CLI help
+python -m src.main --help
+
+# Help for specific commands
+python -m src.main calculate --help
+python -m src.main validate-data --help
+python -m src.main generate-report-only --help
+```
 
 ### Basic Data Validation
 ```bash
+# Validate data file with default configuration
+python -m src.main validate-data test_data.csv
+
+# Validate with custom configuration
 python -m src.main validate-data test_data.csv --config test_config.yaml
+
+# Verbose validation with detailed output
+python -m src.main validate-data test_data.csv --config test_config.yaml --verbose
 ```
 
 ### Full Analysis Run
 ```bash
+# Basic analysis with defaults
+python -m src.main calculate test_data.csv
+
+# Complete analysis with all options
 python -m src.main calculate test_data.csv \
   --config test_config.yaml \
   --output-report analysis_report \
   --output-format pdf \
   --method AlgorithmA \
   --sigma-pt 0.15 \
+  --results-json intermediate_results.json \
   --verbose
+
+# Generate HTML report with CRM method
+python -m src.main calculate participant_data.xlsx \
+  --config crm_config.yaml \
+  --output-report crm_analysis \
+  --output-format html \
+  --method CRM
+
+# Quick analysis with method override
+python -m src.main calculate data.csv --method Expert --output-format docx
 ```
 
 ### Report Generation Only
 ```bash
+# Generate PDF report from existing results
+python -m src.main generate-report-only results.json
+
+# Generate custom format report
 python -m src.main generate-report-only results.json \
   --output-report final_report \
-  --output-format html
+  --output-format html \
+  --config custom_template_config.yaml
+
+# Verbose report generation
+python -m src.main generate-report-only results.json \
+  --output-report detailed_report \
+  --output-format pdf \
+  --verbose
+```
+
+### Common CLI Patterns
+```bash
+# Save intermediate results for later report generation
+python -m src.main calculate data.csv \
+  --results-json results_backup.json \
+  --output-report initial_report
+
+# Later, generate additional reports from saved results
+python -m src.main generate-report-only results_backup.json \
+  --output-report management_summary \
+  --output-format docx
+
+# Validate data before running full analysis
+python -m src.main validate-data data.csv --config analysis_config.yaml
+python -m src.main calculate data.csv --config analysis_config.yaml
 ```
 
 ## Configuration Format Examples
