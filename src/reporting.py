@@ -152,7 +152,7 @@ import json
 from pathlib import Path
 
 # Load report data
-with open(params.data_file, 'r') as f:
+with open(params['data_file'], 'r') as f:
     data = json.load(f)
 ```
 
@@ -252,24 +252,17 @@ if 'participant_results' in data:
 ```{{python}}
 #| echo: false
 if 'plot_paths' in data:
-    import matplotlib.pyplot as plt
-    import matplotlib.image as mpimg
+    from IPython.display import Image, display
     
     if 'histogram' in data['plot_paths']:
-        plt.figure(figsize=(10, 6))
-        img = mpimg.imread(data['plot_paths']['histogram'])
-        plt.imshow(img)
-        plt.axis('off')
-        plt.title('Histogram of Results')
-        plt.show()
+        print("**Histogram of Results:**")
+        print("")
+        display(Image(data['plot_paths']['histogram']))
     
     if 'density' in data['plot_paths']:
-        plt.figure(figsize=(10, 6))
-        img = mpimg.imread(data['plot_paths']['density'])
-        plt.imshow(img)
-        plt.axis('off')
-        plt.title('Density Plot')
-        plt.show()
+        print("**Density Plot:**")
+        print("")
+        display(Image(data['plot_paths']['density']))
 ```
 
 ## Participant Performance
@@ -277,77 +270,86 @@ if 'plot_paths' in data:
 ```{{python}}
 #| echo: false
 if 'results' in data and 'participant_scores' in data['results']:
-    import numpy as np
-    
-    participant_ids = data['participant_ids']
-    z_scores = data['results']['participant_scores']
-    z_prime_scores = data['results'].get('participant_z_prime_scores', [])
-    
-    has_z_prime = len(z_prime_scores) == len(z_scores)
-    
-    print("### Performance Table")
-    print("")
-    
-    if has_z_prime:
-        print("| Participant ID | Result | Z-Score | Z'-Score | Z Performance | Z' Performance |")
-        print("|----------------|--------|---------|----------|---------------|----------------|")
-    else:
-        print("| Participant ID | Result | Z-Score | Performance |")
-        print("|----------------|--------|---------|-------------|")
-    
-    for i, (pid, z_score) in enumerate(zip(participant_ids, z_scores)):
-        result = data['participant_results'][i]
+    try:
+        import numpy as np
         
-        # Determine z-score performance category
-        if abs(z_score) <= 2.0:
-            z_performance = "Satisfactory"
-        elif abs(z_score) <= 3.0:
-            z_performance = "Questionable"
+        participant_ids = data.get('participant_ids', [])
+        z_scores = data['results'].get('participant_scores', [])
+        z_prime_scores = data['results'].get('participant_z_prime_scores', [])
+        
+        if not participant_ids or not z_scores:
+            print("No participant data available for performance analysis.")
+        elif len(participant_ids) != len(z_scores):
+            print("Warning: Mismatch between participant IDs and scores.")
         else:
-            z_performance = "Unsatisfactory"
-        
-        if has_z_prime:
-            z_prime = z_prime_scores[i]
+            has_z_prime = len(z_prime_scores) == len(z_scores)
             
-            # Determine z'-score performance category  
-            if abs(z_prime) <= 2.0:
-                z_prime_performance = "Satisfactory"
-            elif abs(z_prime) <= 3.0:
-                z_prime_performance = "Questionable"
+            print("### Performance Table")
+            print("")
+            
+            if has_z_prime:
+                print("| Participant ID | Result | Z-Score | Z'-Score | Z Performance | Z' Performance |")
+                print("|----------------|--------|---------|----------|---------------|----------------|")
             else:
-                z_prime_performance = "Unsatisfactory"
+                print("| Participant ID | Result | Z-Score | Performance |")
+                print("|----------------|--------|---------|-------------|")
             
-            print(f"| {pid} | {result:.4f} | {z_score:.3f} | {z_prime:.3f} | {z_performance} | {z_prime_performance} |")
-        else:
-            print(f"| {pid} | {result:.4f} | {z_score:.3f} | {z_performance} |")
+            for i, (pid, z_score) in enumerate(zip(participant_ids, z_scores)):
+                result = data['participant_results'][i]
+                
+                # Determine z-score performance category
+                if abs(z_score) <= 2.0:
+                    z_performance = "Satisfactory"
+                elif abs(z_score) <= 3.0:
+                    z_performance = "Questionable"
+                else:
+                    z_performance = "Unsatisfactory"
+                
+                if has_z_prime:
+                    z_prime = z_prime_scores[i]
+                    
+                    # Determine z'-score performance category  
+                    if abs(z_prime) <= 2.0:
+                        z_prime_performance = "Satisfactory"
+                    elif abs(z_prime) <= 3.0:
+                        z_prime_performance = "Questionable"
+                    else:
+                        z_prime_performance = "Unsatisfactory"
+                    
+                    print(f"| {pid} | {result:.4f} | {z_score:.3f} | {z_prime:.3f} | {z_performance} | {z_prime_performance} |")
+                else:
+                    print(f"| {pid} | {result:.4f} | {z_score:.3f} | {z_performance} |")
+            
+            # Summary statistics for z-scores
+            z_satisfactory = sum(1 for z in z_scores if abs(z) <= 2.0)
+            z_questionable = sum(1 for z in z_scores if 2.0 < abs(z) <= 3.0)
+            z_unsatisfactory = sum(1 for z in z_scores if abs(z) > 3.0)
+            
+            print("")
+            print("### Z-Score Performance Summary")
+            print("")
+            print(f"- **Satisfactory** (|z| ≤ 2.0): {z_satisfactory} participants")
+            print(f"- **Questionable** (2.0 < |z| ≤ 3.0): {z_questionable} participants")  
+            print(f"- **Unsatisfactory** (|z| > 3.0): {z_unsatisfactory} participants")
+            
+            # Summary statistics for z'-scores if available
+            if has_z_prime:
+                z_prime_satisfactory = sum(1 for z in z_prime_scores if abs(z) <= 2.0)
+                z_prime_questionable = sum(1 for z in z_prime_scores if 2.0 < abs(z) <= 3.0)
+                z_prime_unsatisfactory = sum(1 for z in z_prime_scores if abs(z) > 3.0)
+                
+                print("")
+                print("### Z'-Score Performance Summary")
+                print("")
+                print(f"- **Satisfactory** (|z'| ≤ 2.0): {z_prime_satisfactory} participants")
+                print(f"- **Questionable** (2.0 < |z'| ≤ 3.0): {z_prime_questionable} participants")  
+                print(f"- **Unsatisfactory** (|z'| > 3.0): {z_prime_unsatisfactory} participants")
+                
+                print("")
+                print("**Note:** Z'-scores (zeta-scores) account for participant measurement uncertainties and the uncertainty of the assigned value.")
     
-    # Summary statistics for z-scores
-    z_satisfactory = sum(1 for z in z_scores if abs(z) <= 2.0)
-    z_questionable = sum(1 for z in z_scores if 2.0 < abs(z) <= 3.0)
-    z_unsatisfactory = sum(1 for z in z_scores if abs(z) > 3.0)
-    
-    print("")
-    print("### Z-Score Performance Summary")
-    print("")
-    print(f"- **Satisfactory** (|z| ≤ 2.0): {z_satisfactory} participants")
-    print(f"- **Questionable** (2.0 < |z| ≤ 3.0): {z_questionable} participants")  
-    print(f"- **Unsatisfactory** (|z| > 3.0): {z_unsatisfactory} participants")
-    
-    # Summary statistics for z'-scores if available
-    if has_z_prime:
-        z_prime_satisfactory = sum(1 for z in z_prime_scores if abs(z) <= 2.0)
-        z_prime_questionable = sum(1 for z in z_prime_scores if 2.0 < abs(z) <= 3.0)
-        z_prime_unsatisfactory = sum(1 for z in z_prime_scores if abs(z) > 3.0)
-        
-        print("")
-        print("### Z'-Score Performance Summary")
-        print("")
-        print(f"- **Satisfactory** (|z'| ≤ 2.0): {z_prime_satisfactory} participants")
-        print(f"- **Questionable** (2.0 < |z'| ≤ 3.0): {z_prime_questionable} participants")  
-        print(f"- **Unsatisfactory** (|z'| > 3.0): {z_prime_unsatisfactory} participants")
-        
-        print("")
-        print("**Note:** Z'-scores (zeta-scores) account for participant measurement uncertainties and the uncertainty of the assigned value.")
+    except Exception as e:
+        print(f"Error processing participant data: {e}")
 ```
 
 ## Statistical Summary

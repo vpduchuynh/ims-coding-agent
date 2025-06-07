@@ -102,7 +102,7 @@ def test_template_creation():
         assert 'title: "Proficiency Testing Report"' in content
         assert 'params:' in content
         assert 'data_file:' in content
-        assert 'params.data_file' in content
+        assert 'params[\'data_file\']' in content
         assert '{{python}}' in content
         assert 'Methodology' in content
         assert 'Participant Performance' in content
