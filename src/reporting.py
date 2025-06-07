@@ -142,6 +142,8 @@ format:
     toc: true
     number-sections: true
 date: now
+params:
+  data_file: ""
 ---
 
 ```{{python}}
@@ -150,7 +152,7 @@ import json
 from pathlib import Path
 
 # Load report data
-with open('{{data_file}}', 'r') as f:
+with open(params['data_file'], 'r') as f:
     data = json.load(f)
 ```
 
@@ -168,8 +170,53 @@ This report presents the results of proficiency testing analysis conducted using
 
 ### Assigned Value and Uncertainty
 
-- **Assigned value (x_pt)**: `{{python}} f"{data['results']['x_pt']:.6f}" if 'x_pt' in data['results'] else "Not calculated"`
-- **Uncertainty (u(x_pt))**: `{{python}} f"{data['results']['u_x_pt']:.6f}" if 'u_x_pt' in data['results'] else "Not calculated"`
+- **Assigned value (x_pt)**: `{{python}} f"{data['results']['x_pt']:.6f}" if 'results' in data and 'x_pt' in data['results'] else "Not calculated"`
+- **Uncertainty (u(x_pt))**: `{{python}} f"{data['results']['u_x_pt']:.6f}" if 'results' in data and 'u_x_pt' in data['results'] else "Not calculated"`
+
+```{{python}}
+#| echo: false
+# Additional results if available
+if 'results' in data:
+    results = data['results']
+    
+    # Show robust standard deviation if available
+    if 'calculation_details' in results and 's_star' in results['calculation_details']:
+        s_star = results['calculation_details']['s_star']
+        print(f"- **Robust standard deviation (s*)**: {s_star:.6f}")
+    
+    # Show participants used if available  
+    if 'calculation_details' in results and 'participants_used' in results['calculation_details']:
+        participants_used = results['calculation_details']['participants_used']
+        print(f"- **Number of participants in calculation**: {participants_used}")
+    
+    # Show method details
+    if 'method_used' in results:
+        print(f"- **Calculation method**: {results['method_used']}")
+    
+    if 'sigma_pt_used' in results:
+        print(f"- **σ_pt used for assessment**: {results['sigma_pt_used']}")
+```
+
+## Methodology
+
+```{{python}}
+#| echo: false
+if 'results' in data and 'method_used' in data['results']:
+    method = data['results']['method_used']
+    print(f"The assigned value (x_pt) was determined using the **{method}** method.")
+    
+    if method == "AlgorithmA":
+        print("This method implements Algorithm A from ISO 13528:2022, Annex C, which uses robust statistics to determine the assigned value and its uncertainty.")
+    elif method == "CRM":
+        print("This method uses a Certified Reference Material (CRM) as the basis for the assigned value.")
+    elif method == "Formulation":
+        print("This method uses theoretical formulation values as the basis for the assigned value.")
+    elif method == "Expert":
+        print("This method uses expert consensus values as the basis for the assigned value.")
+    
+    print(f"\\nThe standard deviation for proficiency assessment (σ_pt) was set to {data['config']['calculation']['sigma_pt']}.")
+    print("\\nParticipant performance is evaluated using z-scores calculated as z = (x - x_pt) / σ_pt, where x is the participant result.")
+```
 
 ### Participant Results Distribution
 
@@ -200,17 +247,110 @@ if 'participant_results' in data:
     plt.show()
 ```
 
-{{#if plot_paths}}
 ### Additional Plots
 
-{{#if plot_paths.histogram}}
-![Histogram of Results]({{plot_paths.histogram}})
-{{/if}}
+```{{python}}
+#| echo: false
+if 'plot_paths' in data:
+    from IPython.display import Image, display
+    
+    if 'histogram' in data['plot_paths']:
+        print("**Histogram of Results:**")
+        print("")
+        display(Image(data['plot_paths']['histogram']))
+    
+    if 'density' in data['plot_paths']:
+        print("**Density Plot:**")
+        print("")
+        display(Image(data['plot_paths']['density']))
+```
 
-{{#if plot_paths.density}}
-![Density Plot]({{plot_paths.density}})
-{{/if}}
-{{/if}}
+## Participant Performance
+
+```{{python}}
+#| echo: false
+if 'results' in data and 'participant_scores' in data['results']:
+    try:
+        import numpy as np
+        
+        participant_ids = data.get('participant_ids', [])
+        z_scores = data['results'].get('participant_scores', [])
+        z_prime_scores = data['results'].get('participant_z_prime_scores', [])
+        
+        if not participant_ids or not z_scores:
+            print("No participant data available for performance analysis.")
+        elif len(participant_ids) != len(z_scores):
+            print("Warning: Mismatch between participant IDs and scores.")
+        else:
+            has_z_prime = len(z_prime_scores) == len(z_scores)
+            
+            print("### Performance Table")
+            print("")
+            
+            if has_z_prime:
+                print("| Participant ID | Result | Z-Score | Z'-Score | Z Performance | Z' Performance |")
+                print("|----------------|--------|---------|----------|---------------|----------------|")
+            else:
+                print("| Participant ID | Result | Z-Score | Performance |")
+                print("|----------------|--------|---------|-------------|")
+            
+            for i, (pid, z_score) in enumerate(zip(participant_ids, z_scores)):
+                result = data['participant_results'][i]
+                
+                # Determine z-score performance category
+                if abs(z_score) <= 2.0:
+                    z_performance = "Satisfactory"
+                elif abs(z_score) <= 3.0:
+                    z_performance = "Questionable"
+                else:
+                    z_performance = "Unsatisfactory"
+                
+                if has_z_prime:
+                    z_prime = z_prime_scores[i]
+                    
+                    # Determine z'-score performance category  
+                    if abs(z_prime) <= 2.0:
+                        z_prime_performance = "Satisfactory"
+                    elif abs(z_prime) <= 3.0:
+                        z_prime_performance = "Questionable"
+                    else:
+                        z_prime_performance = "Unsatisfactory"
+                    
+                    print(f"| {pid} | {result:.4f} | {z_score:.3f} | {z_prime:.3f} | {z_performance} | {z_prime_performance} |")
+                else:
+                    print(f"| {pid} | {result:.4f} | {z_score:.3f} | {z_performance} |")
+            
+            # Summary statistics for z-scores
+            z_satisfactory = sum(1 for z in z_scores if abs(z) <= 2.0)
+            z_questionable = sum(1 for z in z_scores if 2.0 < abs(z) <= 3.0)
+            z_unsatisfactory = sum(1 for z in z_scores if abs(z) > 3.0)
+            
+            print("")
+            print("### Z-Score Performance Summary")
+            print("")
+            print(f"- **Satisfactory** (|z| ≤ 2.0): {z_satisfactory} participants")
+            print(f"- **Questionable** (2.0 < |z| ≤ 3.0): {z_questionable} participants")  
+            print(f"- **Unsatisfactory** (|z| > 3.0): {z_unsatisfactory} participants")
+            
+            # Summary statistics for z'-scores if available
+            if has_z_prime:
+                z_prime_satisfactory = sum(1 for z in z_prime_scores if abs(z) <= 2.0)
+                z_prime_questionable = sum(1 for z in z_prime_scores if 2.0 < abs(z) <= 3.0)
+                z_prime_unsatisfactory = sum(1 for z in z_prime_scores if abs(z) > 3.0)
+                
+                print("")
+                print("### Z'-Score Performance Summary")
+                print("")
+                print(f"- **Satisfactory** (|z'| ≤ 2.0): {z_prime_satisfactory} participants")
+                print(f"- **Questionable** (2.0 < |z'| ≤ 3.0): {z_prime_questionable} participants")  
+                print(f"- **Unsatisfactory** (|z'| > 3.0): {z_prime_unsatisfactory} participants")
+                
+                print("")
+                print("**Note:** Z'-scores (zeta-scores) account for participant measurement uncertainties and the uncertainty of the assigned value.")
+    
+    except Exception as e:
+        print(f"Error processing participant data: {e}")
+```
 
 ## Statistical Summary
 
@@ -237,6 +377,45 @@ if 'participant_results' in data:
     print("|-----------|-------|")
     for stat, value in summary_stats.items():
         print(f"| {stat} | {value:.6f} |")
+```
+
+## Configuration Details
+
+```{{python}}
+#| echo: false
+if 'config' in data:
+    config = data['config']
+    
+    print("### Calculation Configuration")
+    print("")
+    print("| Parameter | Value |")
+    print("|-----------|-------|")
+    print(f"| Method | {config['calculation']['method']} |")
+    print(f"| σ_pt | {config['calculation']['sigma_pt']} |")
+    
+    print("")
+    print("### Input Data Configuration")
+    print("")
+    print("| Parameter | Value |")
+    print("|-----------|-------|")
+    print(f"| Participant ID Column | {config['input_data']['participant_id_col']} |")
+    print(f"| Result Column | {config['input_data']['result_col']} |")
+    if config['input_data']['uncertainty_col']:
+        print(f"| Uncertainty Column | {config['input_data']['uncertainty_col']} |")
+
+if 'results' in data and 'calculation_details' in data['results']:
+    details = data['results']['calculation_details']
+    
+    print("")
+    print("### Calculation Details")
+    print("")
+    
+    if 'tolerance' in details:
+        print(f"- **Convergence tolerance**: {details['tolerance']}")
+    if 'max_iterations' in details:
+        print(f"- **Maximum iterations**: {details['max_iterations']}")
+    if 'iterations' in details:
+        print(f"- **Actual iterations**: {details['iterations']}")
 ```
 
 ---
@@ -275,7 +454,7 @@ def _invoke_quarto(template_path: Path, output_path: Path, output_format: str,
             'quarto', 'render', str(template_path),
             '--to', output_format,
             '--output', str(output_path),
-            '--metadata', f'data_file={data_file_path}'
+            '-P', f'data_file={data_file_path}'
         ]
         
         # Execute Quarto command
